@@ -3,6 +3,8 @@ const cors = require("cors");
 const { KJUR, RSAKey, pemtohex, KEYUTIL } = require("jsrsasign");
 require("dotenv").config();
 const axios = require("axios");
+const crypto = require("crypto");
+const web3 = require("web3");
 
 const app = express();
 
@@ -22,49 +24,56 @@ app.post("/api/game/connect", async (req, res) => {
       "mutation GameConnect($email: String!) { GameConnect(email: $email) {gameId name userId status } }";
     const variables = { email: "anoyroyc3545@gmail.com" };
     const url = "http://api.reneverse.io/graphql";
+    let utf8Encode = new TextEncoder();
 
-    const body = JSON.stringify({ query });
+    const body = {
+      query: query,
+      operationName: "GameConnect",
+      variables: variables,
+    };
 
     const queryInput = JSON.stringify({
       query,
       variables,
     });
 
-    let utf8Encode = new TextEncoder();
     const encodedInput = utf8Encode.encode(queryInput);
 
-    // const keyHex = pemtohex(PEMPrivateKeyString);
-    // var a = RSAKey.getHexValueArrayOfChildrenFromHex(keyHex);
-    // console.log(a);
-    // var PEMPrivateKey = new RSAKey();
-    // PEMPrivateKey.setPrivateEx(a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8]);
-
-    var sig = new KJUR.crypto.Signature({ alg: "SHA256withRSA" });
-
     const PEMPrivateKeyString =
-      "-----BEGIN PRIVATE KEY-----\r\n                    " +
+      "-----BEGIN PRIVATE KEY-----\r\n" +
       privateKey +
-      "\r\n                    -----END PRIVATE KEY-----";
+      "\r\n-----END PRIVATE KEY-----";
 
-    const prvKey = KEYUTIL.getKey(PEMPrivateKeyString);
+    // const signer = crypto.createSign("RSA-SHA256");
+    // signer.update(encodedInput);
+    // const Signature = signer.sign(PEMPrivateKeyString, "base64");
 
+    const prvKey = KEYUTIL.getKeyFromPlainPrivatePKCS8PEM(PEMPrivateKeyString);
+    var sig = new KJUR.crypto.Signature({ alg: "SHA256withRSA" });
     sig.init(prvKey);
     sig.updateString(encodedInput);
-    var sigValueHex = sig.sign();
-    var base64String = Buffer.from(hexString, "hex").toString("base64");
+    var hexSign = sig.sign();
+    var Signature = Buffer.from(hexSign, "hex").toString("base64");
 
-    const value = APIKey + "." + base64String;
-    console.log(value);
+    const value = APIKey + "." + Signature;
     const output = value.replace("=", "*");
+    console.log(output);
 
     const header = {
-      Accept: "application/graphql+json",
-      Accept: "application/json",
+      "Content-Type": "application/json",
       "Accept-Charset": "utf-8",
-      Authorization: output,
+      "Accept-Encoding": "gzip, deflate, br",
+      Host: "api.reneverse.io",
+      Accept: "application/graphql+json",
+      Accept: "application/json;charset=UTF-8",
+      authorization: output,
     };
 
-    const response = await axios.post(url, body, { headers: header });
+    const response = await axios
+      .post(url, body, { headers: header })
+      .catch((err) => {
+        return res.status(500).send(err);
+      });
     return res.json(response.data);
   } catch (err) {
     res.status(500).send(err);
