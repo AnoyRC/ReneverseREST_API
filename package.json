@@ -10,15 +10,20 @@
   "author": "Anoy Roy Chowdhury",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/protocol-http": "^3.374.0",
     "axios": "^1.4.0",
     "body-parser": "^1.20.2",
     "config": "^3.3.9",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
+    "crypto-js": "^4.1.1",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-validator": "^7.0.1",
+    "jsencrypt": "^3.3.2",
     "jsrsasign": "^10.8.6",
+    "node-jsencrypt": "^1.0.0",
+    "node-rsa": "^1.1.1",
     "nodemon": "^3.0.1",
     "web3": "^4.1.1"
   }

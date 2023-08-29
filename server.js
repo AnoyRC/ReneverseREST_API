@@ -1,81 +1,75 @@
 const express = require("express");
 const cors = require("cors");
-const { KJUR, RSAKey, pemtohex, KEYUTIL } = require("jsrsasign");
 require("dotenv").config();
-const axios = require("axios");
 const crypto = require("crypto");
-const web3 = require("web3");
+const { HttpRequest } = require("@aws-sdk/protocol-http");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json({ extended: false }));
 
-const gameId = "ec61338d-88f2-4439-ac57-4e6ef914c7d5";
-const APIKey = "334e4afd-d308-42fa-b6be-208d3d48c1d4";
+const gameId = "c2f28c4c-206c-49da-bba3-8ea9c9b62356";
+const APIKey = "1db338bb-cc1c-4760-b1c6-dfcae73c7ba9";
 const privateKey =
-  "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDU9LiRB59ZXQLwHdUKrYFBJFf/MSTMSCB/z8iCZz0TAQyBI3/Viuextp/CA993hjAKBbhSdqb7eEEWISYRtQOP6CtXvpTPG27B+epHD2yZekVIQnJVbrNpnh1ogv4Wj2mEVsW/1xs6KI0BTV2HyDyjA2Ol8MeceBnvB4wriic4tvGGEZ2KOAQVk8zIEGDc+oAyIgQ3DFu3PlQnsesP9UowriaHgQt6E2gGZjhjmwcjUut/GX/Hn6jG3YlGvZKCr7O38l5SNoWfPA+BF3y7DFoC0pkz7HGsYo1ZLyFPr8nXYsi5LlD+3X/uaubCucQ/XQ9DH/JRUvNfgUnEP8/83EobAgMBAAECggEAaiUYoeFkwcwknL6h49KbrHaLDf3W06PX3x0YWjdPL9vD+dJR84Rq/B+E/dWkWxUdeMFlIGVX0dwcxQT8zrKk9ePJRtENpzWLPVBuP8EmZlGVmvDTwFWPQ8O18NPqBiCxfW8q3fY/8fsoXU/MoNNjtfUIhDvBovISKxxd943DAvbz9KHdLHbFzL1ba2/7+Vh74zJLI8ng63/JOCOwwNZB18Kb2eTqN+8MkRySCHPUZfzoHvlm/UdLjqFNmyTSIoQFyNpelqOCLQLyNckwcCps0tPiJ8M/mQIkcbks30UKrcKKrRyaCOke0A8AK3vwYSs6S1TClMiaDngYML3v00pH0QKBgQDzFNEln1LrDo0/kyIjqVTUgo80orCq/fa9Pszh9Ooqwv/KKvlJTD2boZPL9niSXyHZezaeTWeRtcnF7TEs/vWTKrj67f6OW1ebUGs82BHGdRZas9R8/n2+pvmXeK1jkaIFQrdXDOvJM3jABy7p2ZNMAiSdKstX1ZXLjCpuPum5ZwKBgQDgRgplN1YekGm36V84aStnyhuX59QrUDZz0RQ870o8XLPtkz3TCZJdqEHi9Ytut7yI7uMZua4XbYO0FHyCS/1ljnYQ3G+R8h0K10Iy7fGWaYH2Fxl7LI5C0wRxhr6cWz9zi3kpZLrflSRmUT3tXrDkgl1Tag8NytLpT7/8jtzVLQKBgQCCF4f/PI9h4T3S4mmI8FzIBr+hidhHCvf8PBnma+7Ox+GhTvJvOfBW1FiG9fd9TpCNFhYbDo35O3MrDFAfJqxDAMBS+wAbK+Ns6dMakwCgV5WJIWj9JC4j1LULTbht60jsy9HXMsEVwwhCrRV8bccZDKSPwJFnBpXOg8tJiT4IzQKBgQCJyz7T1V36RWxO7PnuJN/gUxMFEBER06TBH/K5RaRs1eBO1aqkoTrmhFyG36qdihIyZ+PsiGLoTgcfe37MZ3f3D8KGtYlvODyTzpIDzKIkcgrBcovbXBLEB/aw8cLnOkEP8t+siREwEehdXQkZcJZqr5Y7i+xX4wgXBULGH9iauQKBgGikYmlv2z48xIHKMl51Ps04FUSZEYy4KGUd1wPoz03k4a6lr7Ha/IKwVDYuifX5RZH98KoAjd2y424uqE/H+dKU45vTIP+8mDLIme6PuG+iEGvolQj71hJA/0W6eWyaec4KUxPeNPvJikZrGGyP+tC4LBRuBPUmDtvDu8lhdHRM";
+  "MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCt2RZcik2tB7CvlWtVRIYOoP3Ih91aAdvRT8ZCACC1kNGowsqETFU+enlAy0xIsRhGfBj99vuPh50rupCI8LQ9uFVK0eXbYD3CbNbtyKm+Xz8drehwcsGwkJlRPAY2KRkTsJv3Bffi2x80f2kNSCaKt0YGq4m6kXk+tOiLH1mf1apYspvaXvxLaxZJRXXBA8qbc0qtvWBIGxF5K0DYjqZlVhBNLDhuTrhpwGzHn7U6jkNlk680G8Pew4ThYUiKVEtGE/rwv3miCSAn19EOTpJKqlu3vbxTJjs1VwICcC5789s18sQkOAC46IIQyOyVlHONhnykUxBM9i21dSTSGB//AgMBAAECggEATcNUSFKpCiPteazplPuQx4xl2MRFVBSOwiLf+Pfbqbu8vLNdKS6H1umrwTruxXlJ9YVfHILU5c/wkvXh3w9kYFNK+6vGGIoFNim/Ph/LJdevANSgq2P5lcQogHjMAoABspgGO8nUpwoC/FWdpQ5IBzaRwTwL4INf65e6iTidu2t3JXEwPEzncx0icVXJ6S7B/ARLOLkO/npsnkzE1Bnhbgx79oEzvXeI7o5zfZ817Jm5T1Rn55lB6Iiw8XMTylcm6KmATwy1oAqsmtzcthG+NMXbOfHiulozKSORXKN0ji83SFo5suq8/q7Ia39nUqlDzckZypVlm6XRacfjlOLCsQKBgQDojG1u/x6LmCdR4Q0tPTFPVan/vFy7eHgZVk0sJkG92iuHo5dXk1+ro8WIOtZO13jlDo8LNrBEg3ZQ0ue0NLufl/7j6K0Cz2UuoaK/skRDLVfD4USn+i7jGsK58hokLCy9UUM53e6PUxqgl8P34dLBksPb66o66LDSycXaOXBaWQKBgQC/YTiy7z1eVc1LTCjZsmNUcufoWacRJ0QR4figkdxh66Mq7OaWnwQgkdVk3jjXoEJi80i6RpuF6HPDTplkAzQcbg8kqtCssnvfPfCbX0jt1g3kigIZUHqF01BT51HvJ+6uQgIJrNTe2ZxkN3tUYJ2rLSGpPQ4G2n2sCKPLw5vSFwKBgC/nHXPL4cLnqNHZBhnXjRzGjKo9ZuzHOBYgDO2XQ9uT4XujWz2TAhYdOkeBtzuubxzgDt9EeLLkUa78gvZAFpYdfUf9WgZGKpWcfiX21tDvujCDat0fUCFAFfSvxmrFHsIwxyRYbxffCpEiMiARyJRPY0EeHobb//Cr17HIOzihAoGAaj6v+m5klF1v5jB2sTyedkCATHaREC3LVV4s5/9x6I6ne+oerVnEMcykOiZASjy2/jXvlzIhnvqIYdHdyC8bG/lhwMpvpKBFso6xZ6BDXX4rIkgXmDQcgPTqMFpIG0wA7o7IkNR5LOqELwK6HgKxJVmdyVWS1u0vPXVicXm7pKsCgYB5oGukqp1y2EtlWQLVNgSvsZ5IXX8uXRDy6u4PL6ekf6QHnI53x799uCeqDNiv5JTMm+d/CQ9fsEf/4HjFBjo2bmsVoWyAPYhuvx2Bw7LT0WZO6UJmhG5mb9XDXct23qZdmEZitvHOF00Ga8l4YtZZAhogkB8oDdQ0T24Y3dxfnw==";
 
 app.get("/", (req, res) => res.send("API Running"));
 
+const getSignatureByInput = (input) => {
+  const privatePem = `-----BEGIN PRIVATE KEY-----\n${privateKey}\n-----END PRIVATE KEY-----`;
+  const sign = crypto.createSign("RSA-SHA256");
+  sign.update(input);
+  const signature = sign.sign(privatePem, "base64");
+  return signature;
+};
+
 app.post("/api/game/connect", async (req, res) => {
   try {
-    const query =
-      "mutation GameConnect($email: String!) { GameConnect(email: $email) {gameId name userId status } }";
-    const variables = { email: "anoyroyc3545@gmail.com" };
-    const url = "http://api.reneverse.io/graphql";
-    let utf8Encode = new TextEncoder();
+    const externalGateway = new URL("https://api.stg.reneverse.io/graphql");
 
-    const body = {
-      query: query,
+    const authorizationQuery = `
+    mutation GameConnect($email: String!) { GameConnect(email: $email) {gameId name userId status } }
+        `;
+
+    const operation = {
       operationName: "GameConnect",
-      variables: variables,
     };
 
-    const queryInput = JSON.stringify({
-      query,
-      variables,
+    const mutation = {
+      query: authorizationQuery,
+      operationName: operation,
+      variables: {
+        email: "anoyroyc@reneverse.io",
+      },
+    };
+
+    const token = "";
+
+    const request = new HttpRequest({
+      hostname: externalGateway.hostname,
+      path: externalGateway.pathname,
+      body: JSON.stringify({ ...mutation, ...operation }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        host: externalGateway.hostname,
+        authorization: Buffer.from(
+          `${APIKey}.${getSignatureByInput(JSON.stringify(mutation))}`
+        ).toString("base64"),
+      },
     });
 
-    const encodedInput = utf8Encode.encode(queryInput);
+    console.log(request);
+    const response = await fetch(externalGateway.href, {
+      headers: request.headers,
+      body: request.body,
+      method: request.method,
+    });
 
-    const PEMPrivateKeyString =
-      "-----BEGIN PRIVATE KEY-----\r\n" +
-      privateKey +
-      "\r\n-----END PRIVATE KEY-----";
-
-    // const signer = crypto.createSign("RSA-SHA256");
-    // signer.update(encodedInput);
-    // const Signature = signer.sign(PEMPrivateKeyString, "base64");
-
-    const prvKey = KEYUTIL.getKeyFromPlainPrivatePKCS8PEM(PEMPrivateKeyString);
-    var sig = new KJUR.crypto.Signature({ alg: "SHA256withRSA" });
-    sig.init(prvKey);
-    sig.updateString(encodedInput);
-    var hexSign = sig.sign();
-    var Signature = Buffer.from(hexSign, "hex").toString("base64");
-
-    const value = APIKey + "." + Signature;
-    const output = value.replace("=", "*");
-    console.log(output);
-
-    const header = {
-      "Content-Type": "application/json",
-      "Accept-Charset": "utf-8",
-      "Accept-Encoding": "gzip, deflate, br",
-      Host: "api.reneverse.io",
-      Accept: "application/graphql+json",
-      Accept: "application/json;charset=UTF-8",
-      authorization: output,
-    };
-
-    const response = await axios
-      .post(url, body, { headers: header })
-      .catch((err) => {
-        return res.status(500).send(err);
-      });
-    return res.json(response.data);
+    return res.json(response);
   } catch (err) {
+    console.log(err);
     res.status(500).send(err);
   }
 });
