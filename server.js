@@ -3,8 +3,11 @@ const cors = require("cors");
 require("dotenv").config();
 const crypto = require("crypto");
 const { HttpRequest } = require("@aws-sdk/protocol-http");
-
+const { SubscriptionClient } = require("subscriptions-transport-ws");
+const gql = require("graphql-tag");
+const ws = require("ws");
 const app = express();
+const { v4: uuidv4 } = require("uuid");
 
 app.use(cors());
 app.use(express.json({ extended: false }));
@@ -29,16 +32,23 @@ app.post("/api/game/connect", async (req, res) => {
     const externalGateway = new URL("https://api.stg.reneverse.io/graphql");
 
     const authorizationQuery = `
-    mutation GameConnect($email: String!) { GameConnect(email: $email) {gameId name userId status } }
+    mutation gameConnectOp($email: String!) {
+      GameConnect(email: $email) {
+          email
+          gameId
+          name
+          status
+          userId
+     }
+  }
         `;
 
     const operation = {
-      operationName: "GameConnect",
+      operationName: "gameConnectOp",
     };
 
     const mutation = {
       query: authorizationQuery,
-      operationName: operation,
       variables: {
         email: "anoyroyc@reneverse.io",
       },
@@ -67,7 +77,132 @@ app.post("/api/game/connect", async (req, res) => {
       method: request.method,
     });
 
-    return res.json(response);
+    const parsedResponse = await response.json();
+    res.json(parsedResponse);
+  } catch (err) {
+    console.log(err);
+    res.status(500).send(err);
+  }
+});
+
+app.post("/api/game/auth", async (req, res) => {
+  try {
+    const externalGateway = new URL(
+      "https://api.stg.reneverse.io/subscriptions"
+    );
+
+    const request = new HttpRequest({
+      hostname: externalGateway.hostname,
+      path: externalGateway.pathname,
+      method: "GET",
+    });
+
+    const response = await fetch(externalGateway.href, {
+      method: request.method,
+    });
+
+    const API_ENDPOINT = await response.json();
+
+    const query = `
+  subscription OnGameConnectAuthUpdateOp($gameId: String!, $userId: String!) {
+    OnGameConnectAuthUpdate(gameId: $gameId, userId: $userId) {
+      gameId
+      jwt
+      scopes
+      userId
+      validUntil
+    }
+  }
+`;
+
+    const variables = {
+      gameId,
+      userId: "b7e1598b-7ba2-41e8-9468-017c6c0e77ae",
+    };
+
+    const mutation = {
+      query,
+      variables,
+    };
+
+    const appSyncHeaderData = {
+      authorization: Buffer.from(
+        `${APIKey}.${getSignatureByInput(JSON.stringify(mutation))}`
+      ).toString("base64"),
+      host: API_ENDPOINT.domain,
+    };
+
+    async function createAppSyncWebSocket() {
+      const text = "wss://" + API_ENDPOINT.realtimeDomain + API_ENDPOINT.path;
+
+      const realtimeUri = new URL(text);
+      realtimeUri.searchParams.append(
+        "header",
+        JSON.stringify(appSyncHeaderData)
+      );
+      realtimeUri.searchParams.append("payload", "{}");
+
+      const subscriptionClient = new SubscriptionClient(
+        realtimeUri.toString(),
+        {
+          reconnect: true, // You can adjust these options as needed
+          lazy: true,
+          connectionParams: {
+            // Initialize with any connection parameters if needed
+          },
+        },
+        ws
+      );
+
+      return subscriptionClient;
+    }
+
+    const appSyncWebSocket = await createAppSyncWebSocket();
+
+    async function appSyncSubscribe(clientWebSocket, appSyncHeader, request) {
+      const subscriptionId = uuidv4();
+
+      clientWebSocket.on("message", async (message) => {
+        const data = JSON.parse(message);
+        console.log("Websocket message:", data);
+
+        if (data.type === "connection_ack") {
+          const startPayload = {
+            id: subscriptionId,
+            payload: {
+              data: {
+                query: request.query,
+                operationName: request.operationName,
+                variables: request.variables,
+              },
+              extensions: {
+                authorization: appSyncHeader,
+              },
+            },
+            type: "start",
+          };
+          await clientWebSocket.send(JSON.stringify(startPayload));
+        } else if (data.type === "data") {
+          const payload = JSON.parse(data.payload);
+          if (payload.data) {
+            const stopPayload = {
+              type: "stop",
+              id: subscriptionId,
+            };
+            await clientWebSocket.send(JSON.stringify(stopPayload));
+            clientWebSocket.close();
+          }
+        }
+      });
+    }
+
+    const req = {
+      query: query,
+      operationName: "OnGameConnectAuthUpdateOp",
+      variables: variables,
+    };
+
+    await appSyncSubscribe(appSyncWebSocket, appSyncHeaderData, req);
   } catch (err) {
     console.log(err);
     res.status(500).send(err);

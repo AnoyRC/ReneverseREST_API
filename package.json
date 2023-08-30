@@ -11,6 +11,7 @@
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/protocol-http": "^3.374.0",
+    "aws-sdk": "^2.1447.0",
     "axios": "^1.4.0",
     "body-parser": "^1.20.2",
     "config": "^3.3.9",
@@ -20,11 +21,14 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-validator": "^7.0.1",
+    "graphql-tag": "^2.12.6",
     "jsencrypt": "^3.3.2",
     "jsrsasign": "^10.8.6",
     "node-jsencrypt": "^1.0.0",
     "node-rsa": "^1.1.1",
     "nodemon": "^3.0.1",
-    "web3": "^4.1.1"
+    "subscriptions-transport-ws": "^0.11.0",
+    "web3": "^4.1.1",
+    "ws": "^8.13.0"
   }
 }
