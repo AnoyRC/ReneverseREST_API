@@ -195,7 +195,8 @@ router.get("/auth", basicAuth, async (req, res) => {
      * Listen for errors
      */
     ws.on("error", function message(error) {
-      console.log("error", { error });
+      ws.close();
+      return res.status(500).send({ error });
     });
 
     req.setTimeout(waitForSeconds * 1000, () => {
