@@ -3,11 +3,9 @@ const cors = require("cors");
 require("dotenv").config();
 const crypto = require("crypto");
 const { HttpRequest } = require("@aws-sdk/protocol-http");
-const { SubscriptionClient } = require("subscriptions-transport-ws");
-const gql = require("graphql-tag");
-const ws = require("ws");
 const app = express();
-const { v4: uuidv4 } = require("uuid");
+const { randomUUID } = require("crypto");
+const WebSocket = require("ws");
 
 app.use(cors());
 app.use(express.json({ extended: false }));
@@ -70,7 +68,6 @@ app.post("/api/game/connect", async (req, res) => {
       },
     });
 
-    console.log(request);
     const response = await fetch(externalGateway.href, {
       headers: request.headers,
       body: request.body,
@@ -87,122 +84,110 @@ app.post("/api/game/connect", async (req, res) => {
 
 app.post("/api/game/auth", async (req, res) => {
   try {
-    const externalGateway = new URL(
-      "https://api.stg.reneverse.io/subscriptions"
-    );
-
-    const request = new HttpRequest({
-      hostname: externalGateway.hostname,
-      path: externalGateway.pathname,
-      method: "GET",
-    });
-
-    const response = await fetch(externalGateway.href, {
-      method: request.method,
-    });
-
-    const API_ENDPOINT = await response.json();
-
-    const query = `
-  subscription OnGameConnectAuthUpdateOp($gameId: String!, $userId: String!) {
-    OnGameConnectAuthUpdate(gameId: $gameId, userId: $userId) {
-      gameId
-      jwt
-      scopes
-      userId
-      validUntil
-    }
-  }
-`;
-
-    const variables = {
-      gameId,
-      userId: "b7e1598b-7ba2-41e8-9468-017c6c0e77ae",
-    };
-
-    const mutation = {
-      query,
-      variables,
-    };
-
-    const appSyncHeaderData = {
-      authorization: Buffer.from(
-        `${APIKey}.${getSignatureByInput(JSON.stringify(mutation))}`
-      ).toString("base64"),
-      host: API_ENDPOINT.domain,
-    };
-
-    async function createAppSyncWebSocket() {
-      const text = "wss://" + API_ENDPOINT.realtimeDomain + API_ENDPOINT.path;
-
-      const realtimeUri = new URL(text);
-      realtimeUri.searchParams.append(
-        "header",
-        JSON.stringify(appSyncHeaderData)
-      );
-      realtimeUri.searchParams.append("payload", "{}");
-
-      const subscriptionClient = new SubscriptionClient(
-        realtimeUri.toString(),
-        {
-          reconnect: true, // You can adjust these options as needed
-          lazy: true,
-          connectionParams: {
-            // Initialize with any connection parameters if needed
-          },
-        },
-        ws
-      );
-
-      return subscriptionClient;
-    }
-
-    const appSyncWebSocket = await createAppSyncWebSocket();
-
-    async function appSyncSubscribe(clientWebSocket, appSyncHeader, request) {
-      const subscriptionId = uuidv4();
-
-      clientWebSocket.on("message", async (message) => {
-        const data = JSON.parse(message);
-        console.log("Websocket message:", data);
-
-        if (data.type === "connection_ack") {
-          const startPayload = {
-            id: subscriptionId,
-            payload: {
-              data: {
-                query: request.query,
-                operationName: request.operationName,
-                variables: request.variables,
-              },
-              extensions: {
-                authorization: appSyncHeader,
-              },
-            },
-            type: "start",
-          };
-          await clientWebSocket.send(JSON.stringify(startPayload));
-        } else if (data.type === "data") {
-          const payload = JSON.parse(data.payload);
-          if (payload.data) {
-            const stopPayload = {
-              type: "stop",
-              id: subscriptionId,
-            };
-            await clientWebSocket.send(JSON.stringify(stopPayload));
-            clientWebSocket.close();
-          }
+    const onGameConnectAuth = `
+    subscription OnGameConnectAuthUpdateOp($gameId: String!, $userId: String!) {
+        OnGameConnectAuthUpdate(gameId: $gameId, userId: $userId) {
+            gameId
+            jwt
         }
-      });
-    }
+      }      
+    `.trim();
 
-    const req = {
-      query: query,
-      operationName: "OnGameConnectAuthUpdateOp",
-      variables: variables,
+    const subscription = {
+      query: onGameConnectAuth,
+      variables: {
+        gameId,
+        userId: "b7e1598b-7ba2-41e8-9468-017c6c0e77ae",
+      },
     };
 
-    await appSyncSubscribe(appSyncWebSocket, appSyncHeaderData, req);
+    const headers = {
+      host: "qv5zkk476zd4lijkcjhfea7xrm.appsync-api.eu-central-1.amazonaws.com",
+      Authorization: Buffer.from(
+        `${APIKey}.${getSignatureByInput(JSON.stringify(subscription))}`
+      ).toString("base64"),
+    };
+
+    const url = `wss://qv5zkk476zd4lijkcjhfea7xrm.appsync-realtime-api.eu-central-1.amazonaws.com/graphql`;
+
+    /**
+     * Setting up web-socket connection
+     */
+    // payload should be an empty JSON object
+    const payload = {};
+
+    const base64ApiHeader = Buffer.from(JSON.stringify(headers)).toString(
+      "base64"
+    );
+    const base64Payload = Buffer.from(JSON.stringify(payload)).toString(
+      "base64"
+    );
+    const appsyncUrl =
+      url + "?header=" + base64ApiHeader + "&payload=" + base64Payload;
+
+    const ws = new WebSocket(appsyncUrl, "graphql-ws");
+
+    const websocketSubscriptionMessage = {
+      id: randomUUID(),
+      payload: {
+        data: JSON.stringify({
+          ...subscription,
+          operationName: "OnGameConnectAuthUpdateOp",
+        }),
+        extensions: {
+          authorization: headers,
+        },
+      },
+      type: "start",
+    };
+
+    /**
+     * We need to send connection_init as soon as the web-socket is opened, and wait for
+     * connection_ack before sending the subscription request.
+     */
+    ws.on("open", function open() {
+      ws.send(
+        JSON.stringify({
+          type: "connection_init",
+        })
+      );
+    });
+
+    /**
+     * Listen to events from AppSync
+     */
+    let initializingMode = true;
+    ws.on("message", function message(event) {
+      const parsedEvent = JSON.parse(event);
+      console.log("Received", parsedEvent.payload);
+
+      if (parsedEvent.payload?.data) {
+        ws.close();
+        return res.json({
+          token: parsedEvent.payload?.data?.OnGameConnectAuthUpdate?.jwt,
+        });
+      }
+
+      /**
+       * Only runs once for the handshake with app-sync
+       */
+      if (initializingMode) {
+        if (parsedEvent.type === "connection_ack") {
+          // Acknowledge came, so we can start subscribing
+
+          ws.send(JSON.stringify(websocketSubscriptionMessage));
+          initializingMode = false;
+          return;
+        }
+      }
+    });
+
+    /**
+     * Listen for errors
+     */
+    ws.on("error", function message(error) {
+      console.log("error", { error });
+    });
   } catch (err) {
     console.log(err);
     res.status(500).send(err);
