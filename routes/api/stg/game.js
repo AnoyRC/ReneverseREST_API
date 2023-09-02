@@ -7,6 +7,7 @@ const config = require("config");
 const { HttpRequest } = require("@aws-sdk/protocol-http");
 const { randomUUID } = require("crypto");
 const WebSocket = require("ws");
+const tokenAuth = require("../../../middleware/tokenAuth");
 
 // @route   GET api/stg/game/connect
 // @desc    Sends a request to the Reneverse to connect a user to a game
@@ -71,7 +72,7 @@ router.post(
       });
 
       const parsedResponse = await response.json();
-      res.json(parsedResponse);
+      res.json(parsedResponse.data);
     } catch (err) {
       console.log(err);
       res.status(500).send(err);
@@ -204,6 +205,106 @@ router.get("/auth", basicAuth, async (req, res) => {
       res.status(503);
       res.send(); // propagate cancellation
     });
+  } catch (err) {
+    console.log(err);
+    res.status(500).send(err);
+  }
+});
+
+// @route   GET api/stg/game/assetTemplates
+// @desc    Fetches game assets
+// @access  Public
+router.get("/assetTemplates", [basicAuth, tokenAuth], async (req, res) => {
+  try {
+    const limit = !req.query.limit ? 10 : req.query.limit;
+
+    const externalGateway = new URL(config.get("stg"));
+
+    const authorizationQuery = `
+    query AssetTemplates($limit: String, $nextToken: String, $assetTemplateId: String) {
+       AssetTemplates(input: { limit: $limit, nextToken: $nextToken, assetTemplateId: $assetTemplateId }) { 
+          items { 
+            assetTemplateId 
+            name 
+            attributes { 
+              displayType 
+              maxValue 
+              traitType 
+              values 
+            } data { 
+              description 
+              price 
+              supply 
+            } files { 
+              animations 
+              { 
+                name 
+                url 
+                extension 
+              } images { 
+                name 
+                url 
+                extension 
+              } 
+            } gameEngineFiles { 
+              name 
+              url 
+              extension 
+            } image { 
+              name 
+              url 
+              extension 
+            } metadataTemplates { 
+              backgroundColor 
+              description 
+              name 
+            } 
+          } 
+          limit nextToken 
+        } 
+      }
+        `;
+
+    const operation = {
+      operationName: "AssetTemplates",
+    };
+
+    const query = {
+      query: authorizationQuery,
+      variables: {
+        input: {
+          limit: limit,
+          nextToken: "",
+          assetTemplateId: "",
+        },
+      },
+    };
+
+    const request = new HttpRequest({
+      hostname: externalGateway.hostname,
+      path: externalGateway.pathname,
+      body: JSON.stringify({ ...query, ...operation }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        host: externalGateway.hostname,
+        authorization: Buffer.from(
+          `${req.apiKey}.${getSignatureByInput(
+            req.privateKey,
+            JSON.stringify(query)
+          )}.${req.token}`
+        ).toString("base64"),
+      },
+    });
+
+    const response = await fetch(externalGateway.href, {
+      headers: request.headers,
+      body: request.body,
+      method: request.method,
+    });
+
+    const parsedResponse = await response.json();
+    res.json(parsedResponse.data);
   } catch (err) {
     console.log(err);
     res.status(500).send(err);
