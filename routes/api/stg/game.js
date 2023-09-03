@@ -591,4 +591,163 @@ router.get("/asset", [basicAuth, tokenAuth], async (req, res) => {
     res.status(500).send(err);
   }
 });
+
+// @route   POST api/stg/game/mint
+// @desc    Mints an asset
+// @access  Public
+router.post("/mint", [basicAuth, tokenAuth], async (req, res) => {
+  try {
+    if (!req.body.assetTemplateId)
+      return res.status(400).send("No asset template ID provided");
+
+    const assetTemplateId = req.body.assetTemplateId;
+
+    const isTestNet = !req.body.isTestNet
+      ? true
+      : req.body.isTestNet === "true";
+
+    let metadata = null;
+
+    if (req.body.metadata) {
+      metadata = req.body.metadata;
+    }
+
+    if (!req.body.userId) {
+      return res.status(400).send("No user ID provided");
+    }
+
+    const userId = req.body.userId;
+
+    const externalGateway = new URL(config.get("stg"));
+
+    const authorizationQuery = `
+    mutation MintAsset($assetTemplateId: String!, $isTestNet: Boolean!, $metadata: AssetMetadataInput, $userId: String) { 
+      MintAsset(input: { 
+        assetTemplateId: $assetTemplateId, 
+        isTestNet: $isTestNet, 
+        metadata: $metadata, 
+        userId: $userId
+      }) 
+    }
+        `;
+
+    const operation = {
+      operationName: "MintAsset",
+    };
+
+    let mutation = {
+      query: authorizationQuery,
+      variables: {
+        assetTemplateId: assetTemplateId,
+        isTestNet: isTestNet,
+        userId: userId,
+      },
+    };
+
+    if (metadata) {
+      mutation.variables.metadata = metadata;
+    }
+
+    const request = new HttpRequest({
+      hostname: externalGateway.hostname,
+      path: externalGateway.pathname,
+      body: JSON.stringify({ ...mutation, ...operation }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        host: externalGateway.hostname,
+        authorization: Buffer.from(
+          `${req.apiKey}.${getSignatureByInput(
+            req.privateKey,
+            JSON.stringify(mutation)
+          )}.${req.token}`
+        ).toString("base64"),
+      },
+    });
+
+    const response = await fetch(externalGateway.href, {
+      headers: request.headers,
+      body: request.body,
+      method: request.method,
+    });
+
+    const parsedResponse = await response.json();
+    return res.json(parsedResponse);
+  } catch (err) {
+    console.log(err);
+    res.status(500).send(err);
+  }
+});
+
+// @route   POST api/stg/game/transfer
+// @desc    Transfers an asset
+// @access  Public
+router.post("/transfer", [basicAuth, tokenAuth], async (req, res) => {
+  try {
+    if (!req.body.nftId) return res.status(400).send("No NFT ID provided");
+
+    const nftId = req.body.nftId;
+
+    if (!req.body.receiverUserId)
+      return res.status(400).send("No receiver user ID provided");
+
+    const receiverUserId = req.body.receiverUserId;
+
+    const externalGateway = new URL(config.get("stg"));
+
+    const authorizationQuery = `
+    mutation TransferAsset($nftId: String!, $receiverUserId: String!) { 
+      TransferAsset(input: { 
+        nftId: $nftId, 
+        receiverUserId: $receiverUserId 
+      }) { 
+        nftId 
+        receiverUserId 
+      } 
+    }
+        `;
+
+    const operation = {
+      operationName: "TransferAsset",
+    };
+
+    const mutation = {
+      query: authorizationQuery,
+      variables: {
+        nftId: nftId,
+        receiverUserId: receiverUserId,
+      },
+    };
+
+    const request = new HttpRequest({
+      hostname: externalGateway.hostname,
+      path: externalGateway.pathname,
+      body: JSON.stringify({ ...mutation, ...operation }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        host: externalGateway.hostname,
+        authorization: Buffer.from(
+          `${req.apiKey}.${getSignatureByInput(
+            req.privateKey,
+            JSON.stringify(mutation)
+          )}.${req.token}`
+        ).toString("base64"),
+      },
+    });
+
+    const response = await fetch(externalGateway.href, {
+      headers: request.headers,
+      body: request.body,
+      method: request.method,
+    });
+
+    const parsedResponse = await response.json();
+    return res.json(parsedResponse);
+  } catch (err) {
+    console.log(err);
+    res.status(500).send(err);
+  }
+});
+
 module.exports = router;
