@@ -72,7 +72,7 @@ router.post(
       });
 
       const parsedResponse = await response.json();
-      res.json(parsedResponse.data);
+      res.json(parsedResponse);
     } catch (err) {
       console.log(err);
       res.status(500).send(err);
@@ -304,7 +304,7 @@ router.get("/assetTemplates", [basicAuth, tokenAuth], async (req, res) => {
     });
 
     const parsedResponse = await response.json();
-    res.json(parsedResponse.data.AssetTemplates.items);
+    res.json(parsedResponse);
   } catch (err) {
     console.log(err);
     res.status(500).send(err);
@@ -495,7 +495,7 @@ router.get("/assets", [basicAuth, tokenAuth], async (req, res) => {
     });
 
     const parsedResponse = await response.json();
-    return res.json(parsedResponse.data.Assets.items);
+    return res.json(parsedResponse);
   } catch (err) {
     console.log(err);
     res.status(500).send(err);
