@@ -2,5 +2,7 @@
   "stg": "https://api.stg.reneverse.io/graphql",
   "prod": "https://api.reneverse.io/graphql",
   "aws-host": "qv5zkk476zd4lijkcjhfea7xrm.appsync-api.eu-central-1.amazonaws.com",
-  "aws-url": "wss://qv5zkk476zd4lijkcjhfea7xrm.appsync-realtime-api.eu-central-1.amazonaws.com/graphql"
+  "aws-url": "wss://qv5zkk476zd4lijkcjhfea7xrm.appsync-realtime-api.eu-central-1.amazonaws.com/graphql",
+  "aws-host-prod": "wef2y6skcvenrilnftzwrzfoye.appsync-api.eu-central-1.amazonaws.com",
+  "aws-url-prod": "wss://wef2y6skcvenrilnftzwrzfoye.appsync-realtime-api.eu-central-1.amazonaws.com"
 }

@@ -109,7 +109,7 @@ router.get("/auth", basicAuth, async (req, res) => {
     };
 
     const headers = {
-      host: config.get("aws-host"),
+      host: config.get("aws-host-prod"),
       Authorization: Buffer.from(
         `${req.apiKey}.${getSignatureByInput(
           req.privateKey,
@@ -118,7 +118,7 @@ router.get("/auth", basicAuth, async (req, res) => {
       ).toString("base64"),
     };
 
-    const url = config.get("aws-url");
+    const url = config.get("aws-url-prod");
 
     const payload = {};
 
