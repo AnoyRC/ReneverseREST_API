@@ -1,15 +1,15 @@
 const express = require("express");
-const basicAuth = require("../../../middleware/basicAuth");
+const basicAuth = require("../../middleware/basicAuth");
 const router = express.Router();
-const getSignatureByInput = require("../../../config/headerPrep");
+const getSignatureByInput = require("../../config/headerPrep");
 const { check, validationResult } = require("express-validator");
 const config = require("config");
 const { HttpRequest } = require("@aws-sdk/protocol-http");
 const { randomUUID } = require("crypto");
 const WebSocket = require("ws");
-const tokenAuth = require("../../../middleware/tokenAuth");
+const tokenAuth = require("../../middleware/tokenAuth");
 
-// @route   GET api/stg/game/connect
+// @route   GET api/game/connect
 // @desc    Sends a request to the Reneverse to connect a user to a game
 // @access  Public
 router.post(
@@ -23,7 +23,7 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const externalGateway = new URL(config.get("stg"));
+      const externalGateway = new URL(config.get("prod"));
 
       const authorizationQuery = `
       mutation gameConnectOp($email: String!) {
@@ -80,7 +80,7 @@ router.post(
   }
 );
 
-// @route   GET api/stg/game/auth
+// @route   GET api/game/auth
 // @desc    Fetches Auth Token for a user
 // @access  Public
 router.get("/auth", basicAuth, async (req, res) => {
@@ -211,14 +211,14 @@ router.get("/auth", basicAuth, async (req, res) => {
   }
 });
 
-// @route   GET api/stg/game/assetTemplates
+// @route   GET api/game/assetTemplates
 // @desc    Fetches game assets
 // @access  Public
 router.get("/assetTemplates", [basicAuth, tokenAuth], async (req, res) => {
   try {
     const limit = !req.query.limit ? 10 : req.query.limit;
 
-    const externalGateway = new URL(config.get("stg"));
+    const externalGateway = new URL(config.get("prod"));
 
     const authorizationQuery = `
     query AssetTemplates($limit: String, $nextToken: String, $assetTemplateId: String) {
@@ -311,7 +311,7 @@ router.get("/assetTemplates", [basicAuth, tokenAuth], async (req, res) => {
   }
 });
 
-// @route   GET api/stg/game/assetTemplate
+// @route   GET api/game/assetTemplate
 // @desc    Fetches an asset Template by ID
 // @access  Public
 router.get("/assetTemplate", [basicAuth, tokenAuth], async (req, res) => {
@@ -321,7 +321,7 @@ router.get("/assetTemplate", [basicAuth, tokenAuth], async (req, res) => {
 
     const id = req.query.id;
 
-    const externalGateway = new URL(config.get("stg"));
+    const externalGateway = new URL(config.get("prod"));
 
     const authorizationQuery = `
     query AssetTemplates($limit: String, $nextToken: String, $assetTemplateId: String) {
@@ -418,14 +418,14 @@ router.get("/assetTemplate", [basicAuth, tokenAuth], async (req, res) => {
   }
 });
 
-// @route   GET api/stg/game/assets
+// @route   GET api/game/assets
 // @desc    Fetches all assets
 // @access  Public
 router.get("/assets", [basicAuth, tokenAuth], async (req, res) => {
   try {
     const limit = !req.query.limit ? 10 : req.query.limit;
 
-    const externalGateway = new URL(config.get("stg"));
+    const externalGateway = new URL(config.get("prod"));
 
     const authorizationQuery = `
     query Assets($limit: String, $nextToken: String, $nftId: String) { 
@@ -502,7 +502,7 @@ router.get("/assets", [basicAuth, tokenAuth], async (req, res) => {
   }
 });
 
-// @route   GET api/stg/game/asset
+// @route   GET api/game/asset
 // @desc    Fetches an asset by ID
 // @access  Public
 router.get("/asset", [basicAuth, tokenAuth], async (req, res) => {
@@ -511,7 +511,7 @@ router.get("/asset", [basicAuth, tokenAuth], async (req, res) => {
 
     const id = req.query.id;
 
-    const externalGateway = new URL(config.get("stg"));
+    const externalGateway = new URL(config.get("prod"));
 
     const authorizationQuery = `
     query Assets($limit: String, $nextToken: String, $nftId: String) { 
@@ -592,7 +592,7 @@ router.get("/asset", [basicAuth, tokenAuth], async (req, res) => {
   }
 });
 
-// @route   POST api/stg/game/mint
+// @route   POST api/game/mint
 // @desc    Mints an asset
 // @access  Public
 router.post(
@@ -600,7 +600,7 @@ router.post(
   [
     basicAuth,
     tokenAuth,
-    check("assetTemplateId", "Asset template ID is required").not().isEmpty(),
+    check("assetTemplateId", "Asset Template ID is required").not().isEmpty(),
     check("userId", "User ID is required").not().isEmpty(),
   ],
   async (req, res) => {
@@ -626,7 +626,7 @@ router.post(
 
       const userId = req.body.userId;
 
-      const externalGateway = new URL(config.get("stg"));
+      const externalGateway = new URL(config.get("prod"));
 
       const authorizationQuery = `
     mutation MintAsset($assetTemplateId: String!, $isTestNet: Boolean!, $metadata: AssetMetadataInput, $userId: String) { 
@@ -688,7 +688,7 @@ router.post(
   }
 );
 
-// @route   POST api/stg/game/transfer
+// @route   POST api/game/transfer
 // @desc    Transfers an asset
 // @access  Public
 router.post(
@@ -697,7 +697,7 @@ router.post(
     basicAuth,
     tokenAuth,
     check("nftId", "NFT ID is required").not().isEmpty(),
-    check("receiverUserId", "Receiver user ID is required").not().isEmpty(),
+    check("receiverUserId", "Receiver User ID is required").not().isEmpty(),
   ],
   async (req, res) => {
     try {
@@ -712,7 +712,7 @@ router.post(
 
       const receiverUserId = req.body.receiverUserId;
 
-      const externalGateway = new URL(config.get("stg"));
+      const externalGateway = new URL(config.get("prod"));
 
       const authorizationQuery = `
     mutation TransferAsset($nftId: String!, $receiverUserId: String!) { 
