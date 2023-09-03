@@ -304,11 +304,291 @@ router.get("/assetTemplates", [basicAuth, tokenAuth], async (req, res) => {
     });
 
     const parsedResponse = await response.json();
-    res.json(parsedResponse.data);
+    res.json(parsedResponse.data.AssetTemplates.items);
   } catch (err) {
     console.log(err);
     res.status(500).send(err);
   }
 });
 
+// @route   GET api/stg/game/assetTemplate
+// @desc    Fetches an asset Template by ID
+// @access  Public
+router.get("/assetTemplate", [basicAuth, tokenAuth], async (req, res) => {
+  try {
+    if (!req.query.id)
+      return res.status(400).send("No asset template ID provided");
+
+    const id = req.query.id;
+
+    const externalGateway = new URL(config.get("stg"));
+
+    const authorizationQuery = `
+    query AssetTemplates($limit: String, $nextToken: String, $assetTemplateId: String) {
+       AssetTemplates(input: { limit: $limit, nextToken: $nextToken, assetTemplateId: $assetTemplateId }) { 
+          items { 
+            assetTemplateId 
+            name 
+            attributes { 
+              displayType 
+              maxValue 
+              traitType 
+              values 
+            } data { 
+              description 
+              price 
+              supply 
+            } files { 
+              animations 
+              { 
+                name 
+                url 
+                extension 
+              } images { 
+                name 
+                url 
+                extension 
+              } 
+            } gameEngineFiles { 
+              name 
+              url 
+              extension 
+            } image { 
+              name 
+              url 
+              extension 
+            } metadataTemplates { 
+              backgroundColor 
+              description 
+              name 
+            } 
+          } 
+          limit nextToken 
+        } 
+      }
+        `;
+
+    const operation = {
+      operationName: "AssetTemplates",
+    };
+
+    const query = {
+      query: authorizationQuery,
+      variables: {
+        input: {
+          limit: 1,
+          nextToken: "",
+          assetTemplateId: id,
+        },
+      },
+    };
+
+    const request = new HttpRequest({
+      hostname: externalGateway.hostname,
+      path: externalGateway.pathname,
+      body: JSON.stringify({ ...query, ...operation }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        host: externalGateway.hostname,
+        authorization: Buffer.from(
+          `${req.apiKey}.${getSignatureByInput(
+            req.privateKey,
+            JSON.stringify(query)
+          )}.${req.token}`
+        ).toString("base64"),
+      },
+    });
+
+    const response = await fetch(externalGateway.href, {
+      headers: request.headers,
+      body: request.body,
+      method: request.method,
+    });
+
+    const parsedResponse = await response.json();
+    const assetTemplate = parsedResponse.data.AssetTemplates.items.find(
+      (item) => item.assetTemplateId === id
+    );
+
+    return res.json(assetTemplate);
+  } catch (err) {
+    console.log(err);
+    res.status(500).send(err);
+  }
+});
+
+// @route   GET api/stg/game/assets
+// @desc    Fetches all assets
+// @access  Public
+router.get("/assets", [basicAuth, tokenAuth], async (req, res) => {
+  try {
+    const limit = !req.query.limit ? 10 : req.query.limit;
+
+    const externalGateway = new URL(config.get("stg"));
+
+    const authorizationQuery = `
+    query Assets($limit: String, $nextToken: String, $nftId: String) { 
+      Assets(input: { 
+        limit: $limit, 
+        nextToken: $nextToken, 
+        nftId: $nftId}) { 
+          items { 
+            assetTemplateId 
+            cId 
+            gameId 
+            metadata { 
+              name 
+              description 
+              image 
+              animationUrl 
+              attributes { 
+                traitType 
+                value 
+              } 
+            } 
+            nftId 
+            walletAddress 
+          } 
+          limit 
+          nextToken 
+        } 
+      }
+        `;
+
+    const operation = {
+      operationName: "Assets",
+    };
+
+    const query = {
+      query: authorizationQuery,
+      variables: {
+        input: {
+          limit: limit,
+          nextToken: "",
+          nftId: "",
+        },
+      },
+    };
+
+    const request = new HttpRequest({
+      hostname: externalGateway.hostname,
+      path: externalGateway.pathname,
+      body: JSON.stringify({ ...query, ...operation }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        host: externalGateway.hostname,
+        authorization: Buffer.from(
+          `${req.apiKey}.${getSignatureByInput(
+            req.privateKey,
+            JSON.stringify(query)
+          )}.${req.token}`
+        ).toString("base64"),
+      },
+    });
+
+    const response = await fetch(externalGateway.href, {
+      headers: request.headers,
+      body: request.body,
+      method: request.method,
+    });
+
+    const parsedResponse = await response.json();
+    return res.json(parsedResponse.data.Assets.items);
+  } catch (err) {
+    console.log(err);
+    res.status(500).send(err);
+  }
+});
+
+// @route   GET api/stg/game/asset
+// @desc    Fetches an asset by ID
+// @access  Public
+router.get("/asset", [basicAuth, tokenAuth], async (req, res) => {
+  try {
+    if (!req.query.id) return res.status(400).send("No asset ID provided");
+
+    const id = req.query.id;
+
+    const externalGateway = new URL(config.get("stg"));
+
+    const authorizationQuery = `
+    query Assets($limit: String, $nextToken: String, $nftId: String) { 
+      Assets(input: { 
+        limit: $limit, 
+        nextToken: $nextToken, 
+        nftId: $nftId}) { 
+          items { 
+            assetTemplateId 
+            cId 
+            gameId 
+            metadata { 
+              name 
+              description 
+              image 
+              animationUrl 
+              attributes { 
+                traitType 
+                value 
+              } 
+            } 
+            nftId 
+            walletAddress 
+          } 
+          limit 
+          nextToken 
+        } 
+      }
+        `;
+
+    const operation = {
+      operationName: "Assets",
+    };
+
+    const query = {
+      query: authorizationQuery,
+      variables: {
+        input: {
+          limit: 1,
+          nextToken: "",
+          nftId: id,
+        },
+      },
+    };
+
+    const request = new HttpRequest({
+      hostname: externalGateway.hostname,
+      path: externalGateway.pathname,
+      body: JSON.stringify({ ...query, ...operation }),
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        host: externalGateway.hostname,
+        authorization: Buffer.from(
+          `${req.apiKey}.${getSignatureByInput(
+            req.privateKey,
+            JSON.stringify(query)
+          )}.${req.token}`
+        ).toString("base64"),
+      },
+    });
+
+    const response = await fetch(externalGateway.href, {
+      headers: request.headers,
+      body: request.body,
+      method: request.method,
+    });
+
+    const parsedResponse = await response.json();
+    const asset = parsedResponse.data.Assets.items.find(
+      (item) => item.nftId === id
+    );
+
+    return res.json(asset);
+  } catch (err) {
+    console.log(err);
+    res.status(500).send(err);
+  }
+});
 module.exports = router;
